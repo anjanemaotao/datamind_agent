@@ -1,0 +1,9 @@
+# OS
+.DS_Store
+
+# local tooling / env
+.workbuddy/
+*.genie
+
+# logs
+*.log

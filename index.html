@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DataMind · 数据分析 Agent</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">DM</div>
+    <div class="brand-text">
+      <strong>DataMind</strong>
+      <span>数据分析 Agent · 自然语言问数</span>
+    </div>
+  </div>
+  <div class="topbar-mid">
+    <span class="chip" id="chipDataset">未选择数据集</span>
+    <span class="chip" id="chipRows">0 行</span>
+  </div>
+  <div class="topbar-right">
+    <button class="btn ghost" id="btnModel">模型：未配置</button>
+    <button class="btn ghost" id="btnHelp">使用说明</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- 左栏：数据 -->
+  <aside class="col col-left">
+    <section class="card">
+      <h3 class="card-title">数据接入</h3>
+      <div class="import-actions">
+        <label class="btn primary block">
+          上传文件（CSV / TSV / JSON / Excel）
+          <input type="file" id="fileInput" accept=".csv,.tsv,.txt,.json,.xlsx,.xls" hidden />
+        </label>
+        <button class="btn block" id="btnPaste">粘贴 / 手动输入数据</button>
+        <button class="btn block" id="btnSample">载入示例数据集</button>
+      </div>
+      <p class="hint">数据保存在本机浏览器中，不会上传到任何服务器。</p>
+    </section>
+
+    <section class="card grow">
+      <h3 class="card-title">我的数据集 <span class="count" id="datasetCount">0</span></h3>
+      <div class="dataset-list" id="datasetList"></div>
+    </section>
+
+    <section class="card" id="schemaCard" hidden>
+      <h3 class="card-title">字段信息</h3>
+      <div class="schema-list" id="schemaList"></div>
+    </section>
+  </aside>
+
+  <!-- 中栏：分析对话 -->
+  <section class="col col-center">
+    <div class="chat" id="chatScroll">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">◈</div>
+        <h2>用一句话问你的数据</h2>
+        <p>支持自然语言查询、趋势分析、异常识别与指标对比，自动产出结论与图表。</p>
+        <div class="suggest-grid" id="suggestGrid"></div>
+      </div>
+      <div class="thread" id="thread"></div>
+    </div>
+
+    <div class="composer">
+      <div class="quick-row" id="quickRow"></div>
+      <div class="composer-box">
+        <textarea id="question" rows="2" placeholder="例如：按月份看销售额趋势，并指出异常波动"></textarea>
+        <button class="btn primary send" id="btnAsk">分析</button>
+      </div>
+      <div class="composer-foot">
+        <span id="engineTag" class="tag">引擎：本地规则</span>
+        <span id="statusTag" class="tag muted">准备就绪</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右栏：预览 / 详情 -->
+  <aside class="col col-right">
+    <section class="card grow">
+      <div class="tabs">
+        <button class="tab active" data-tab="preview">数据预览</button>
+        <button class="tab" data-tab="result">结果明细</button>
+        <button class="tab" data-tab="history">分析历史</button>
+      </div>
+      <div class="tab-panel" id="tab-preview">
+        <div class="table-wrap" id="previewWrap"><p class="hint">导入数据后在此预览（最多 100 行）。</p></div>
+      </div>
+      <div class="tab-panel hidden" id="tab-result">
+        <p class="hint">运行分析后，结果明细与原始数据会展示在这里。</p>
+        <div id="resultDetail"></div>
+      </div>
+      <div class="tab-panel hidden" id="tab-history">
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<!-- 粘贴数据弹窗 -->
+<div class="modal" id="pasteModal" hidden>
+  <div class="modal-mask" data-close="1"></div>
+  <div class="modal-body">
+    <h3>粘贴 / 手动输入数据</h3>
+    <p class="hint">支持 CSV、TSV、JSON（数组对象）三种格式，第一行需为表头。</p>
+    <textarea id="pasteText" rows="12" placeholder="日期,渠道,销售额,订单数&#10;2026-01-01,线上,12000,320&#10;2026-01-02,线上,13500,355"></textarea>
+    <div class="row">
+      <input id="pasteName" placeholder="数据集名称" />
+      <button class="btn primary" id="btnPasteSave">导入</button>
+      <button class="btn" data-close="1">取消</button>
+    </div>
+    <p class="err" id="pasteErr"></p>
+  </div>
+</div>
+
+<!-- 模型设置弹窗 -->
+<div class="modal" id="modelModal" hidden>
+  <div class="modal-mask" data-close="1"></div>
+  <div class="modal-body">
+    <h3>大模型接入设置</h3>
+    <p class="hint">填写任意 OpenAI 兼容接口即可启用自然语言理解；不填也能用，将自动降级为本地规则引擎。</p>
+    <label class="field">
+      <span>接口地址 Base URL</span>
+      <input id="cfgBase" placeholder="https://api.openai.com/v1" />
+    </label>
+    <label class="field">
+      <span>API Key</span>
+      <input id="cfgKey" type="password" placeholder="sk-..." />
+    </label>
+    <label class="field">
+      <span>模型名称</span>
+      <input id="cfgModel" placeholder="gpt-4o-mini" />
+    </label>
+    <div class="row">
+      <button class="btn primary" id="btnSaveCfg">保存</button>
+      <button class="btn" id="btnTestCfg">测试连接</button>
+      <button class="btn ghost" id="btnClearCfg">清除</button>
+      <button class="btn" data-close="1">关闭</button>
+    </div>
+    <p class="err" id="cfgMsg"></p>
+    <p class="hint">密钥仅保存在本机浏览器 localStorage，请求由浏览器直连模型服务商。</p>
+  </div>
+</div>
+
+<!-- 使用说明弹窗 -->
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-mask" data-close="1"></div>
+  <div class="modal-body">
+    <h3>使用说明</h3>
+    <ol class="help-list">
+      <li><b>导入数据</b>：上传 CSV/Excel/JSON，或粘贴文本，也可直接载入示例数据。</li>
+      <li><b>提问分析</b>：用自然语言描述需求，Agent 自动判断分析类型。</li>
+      <li><b>四类能力</b>：
+        <ul>
+          <li><b>查询</b>：「华东地区销售额最高的 10 个产品」</li>
+          <li><b>趋势</b>：「按月份看销售额趋势」</li>
+          <li><b>异常</b>：「找出订单数的异常值」</li>
+          <li><b>对比</b>：「对比各渠道的客单价」</li>
+        </ul>
+      </li>
+      <li><b>结果</b>：结论要点 + 指标卡 + 图表 + 明细表，可复制摘要或导出 CSV。</li>
+    </ol>
+    <div class="row"><button class="btn primary" data-close="1">知道了</button></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="assets/store.js"></script>
+<script src="assets/analytics.js"></script>
+<script src="assets/llm.js"></script>
+<script src="assets/charts.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
